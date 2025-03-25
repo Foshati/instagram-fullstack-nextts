@@ -1,0 +1,319 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  admin
+  moderator
+}
+
+enum Plans {
+  FREE
+  PRO
+}
+
+model User {
+  id       String  @id @default(uuid())
+  name     String?
+  username String? @unique
+
+  email String  @unique
+  bio   String?
+  email String  @unique
+
+  dateOfBirth    DateTime?
+  emailVerified  Boolean  @default(false)
+  coverImage     String?
+  profileImage   String?
+  hashedPassword String?
+  image            String?
+
+  twoFactorEnabled Boolean?
+  role             UserRole     @default(user)
+  banned           Boolean?
+  banReason        String?
+  banExpires       DateTime?
+  sessions         Session[]
+  accounts         Account[]
+  members          Member[]
+  invitations      Invitation[]
+  twofactors       TwoFactor[]
+  passkeys         Passkey[]
+  posts            Post[]
+
+  comments      Comment[]
+  notifications Notification[]
+
+  followingIds    Int[]
+  hasNotification Boolean?
+
+  isVerifed    Boolean       @default(false)
+  subscription Subscription?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@map("user")
+}
+
+model Session {
+  id                   String   @id @default(uuid())
+  expiresAt            DateTime
+  token                String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  ipAddress            String?
+  userAgent            String?
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganizationId String?
+  impersonatedBy       String?
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(uuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+model Organization {
+  id          String       @id @default(uuid())
+  name        String
+  slug        String?
+  logo        String?
+  createdAt   DateTime     @default(now())
+  metadata    String?
+  members     Member[]
+  invitations Invitation[]
+
+  @@unique([slug])
+  @@map("organization")
+}
+
+model Member {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@map("member")
+}
+
+model Invitation {
+  id             String       @id
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           String?
+  status         String
+  expiresAt      DateTime
+  inviterId      String
+  user           User         @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@map("invitation")
+}
+
+model TwoFactor {
+  id          String @id
+  secret      String
+  backupCodes String
+  userId      String
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("twoFactor")
+}
+
+model Passkey {
+  id           String    @id
+  name         String?
+  publicKey    String
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int
+  deviceType   String
+  backedUp     Boolean
+  transports   String?
+  createdAt    DateTime?
+
+  @@map("passkey")
+}
+
+model OauthApplication {
+  id           String    @id
+  name         String?
+  icon         String?
+  metadata     String?
+  clientId     String?
+  clientSecret String?
+  redirectURLs String?
+  type         String?
+  disabled     Boolean?
+  userId       String?
+  createdAt    DateTime?
+  updatedAt    DateTime?
+
+  @@unique([clientId])
+  @@map("oauthApplication")
+}
+
+model OauthAccessToken {
+  id                    String    @id
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  clientId              String?
+  userId                String?
+  scopes                String?
+  createdAt             DateTime?
+  updatedAt             DateTime?
+
+  @@unique([accessToken])
+  @@unique([refreshToken])
+  @@map("oauthAccessToken")
+}
+
+model OauthConsent {
+  id           String    @id
+  clientId     String?
+  userId       String?
+  scopes       String?
+  createdAt    DateTime?
+  updatedAt    DateTime?
+  consentGiven Boolean?
+
+  @@map("oauthConsent")
+}
+
+model Post {
+  id        Int     @id @default(autoincrement())
+  title     String  @db.VarChar(200)
+  address   String  @unique
+  body      String  @db.Text
+  image     String
+  published Boolean @default(false)
+  views     Int     @default(0)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([address])
+}
+
+model AccountSocial {
+  id                Int     @id @default(autoincrement())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Subscription {
+  id                     Int       @id @default(autoincrement())
+  userId                 Int       @unique
+  plan                   Plans     @default(FREE)
+  stripeCustomerId       String?   @unique @map(name: "stripe_customer_id")
+  stripeSubscriptionId   String?   @unique @map(name: "stripe_subscription_id")
+  stripePriceId          String?   @map(name: "stripe_price_id")
+  stripeCurrentPeriodEnd DateTime? @map(name: "stripe_current_period_end")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model PostSocial {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  body      String
+  postImage String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  likeIds   Int[]
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments Comment[]
+
+  @@map("posts")
+}
+
+model Comment {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  postId       Int
+  body         String
+  commentImage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
